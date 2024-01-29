@@ -1,0 +1,62 @@
+name: Merge Coverage Reports
+
+on: [push]
+
+jobs:
+  merge-coverage:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Main Repository
+      uses: actions/checkout@v2
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v2
+      with:
+        node-version: '14'
+
+    - name: Install NYC
+      run: npm install -g nyc
+
+    - name: Checkout Repo 1
+      uses: actions/checkout@v2
+      with:
+        repository: 'Brain2life/repo1'
+        token: ${{ secrets.COVERAGE_TOKEN }}
+        path: 'repo1'
+
+    - name: Checkout Repo 2
+      uses: actions/checkout@v2
+      with:
+        repository: 'Brain2life/repo2'
+        token: ${{ secrets.COVERAGE_TOKEN }}
+        path: 'repo2'
+
+    - name: Generate Coverage Report for Repo 1
+      run: |
+        cd repo1
+        npm install
+        npm run test -- --coverage
+        cp -r coverage ../coverage-repo1
+      working-directory: ${{ github.workspace }}
+
+    - name: Generate Coverage Report for Repo 2
+      run: |
+        cd repo2
+        npm install
+        npm run test -- --coverage
+        cp -r coverage ../coverage-repo2
+      working-directory: ${{ github.workspace }}
+
+    - name: Merge Coverage Reports
+      run: |
+        nyc merge coverage-repo1 coverage1.json
+        nyc merge coverage-repo2 coverage2.json
+        nyc report --reporter lcov --temp-directory . --report-dir final-coverage-report
+      working-directory: ${{ github.workspace }}
+
+    - name: Upload Coverage to Artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: merged-coverage-report
+        path: final-coverage-report
